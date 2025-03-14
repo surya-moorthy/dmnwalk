@@ -1,11 +1,8 @@
 import { Router } from "express";
-const client = require("@repo/db");
 export const authRoutes = Router();
 
+import client from "@repo/db";
 
 authRoutes.get('/register',async (req,res)=>{
-   const {username , password , email} = req.body;
-   res.json({
-    msg : client
-   })
+   
 })

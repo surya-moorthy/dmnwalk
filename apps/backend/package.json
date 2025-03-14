@@ -4,19 +4,19 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsc -b && node dist/index.js",
-    "build":"npx esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --tsconfig=tsconfig.json"
+    "build": "npx esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --tsconfig=tsconfig.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    
+    "@repo/db": "*",
     "@types/express": "^5.0.0",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "@repo/db": "*"
+    "zod": "^3.24.2"
   }
 }
