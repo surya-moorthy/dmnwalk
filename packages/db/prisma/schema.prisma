@@ -1,0 +1,236 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id                  Int     @id @default(autoincrement())
+    username            String  @unique
+    password_hash       String
+    email               String  @unique
+    profile_picture_url String?
+    timezone            String  @default("UTC")
+
+    wallets               UserWallet[]           @relation("UserWallets")
+    healthConnections     UserHealthConnection[]
+    Notification          Notification[]         @relation("NotificationToUser")
+    notificationId        Int?
+    dailyProgress         DailyProgress[]
+    ChallengeCreated      Challenge[]            @relation("ChallengeCreator")
+    challengeParticipants ChallengeParticipant[]
+    Rewards               ChallengeReward[]
+    Transaction           Transaction[]
+    achievements          UserAchievement[]
+    FriendShipReq         Friendship[]           @relation("UserFriendRequest")
+    UserFriends           Friendship[]           @relation("FriendOfTheUser")
+    ChallengeGroup        ChallengeGroup[]
+    ChallengeGroupMember  ChallengeGroupMember[]
+}
+
+model UserWallet {
+    id             Int      @id @default(autoincrement())
+    user_id        Int
+    wallet_address String
+    wallet_type    String   @default("solana")
+    is_primary     Boolean  @default(true)
+    created_at     DateTime @default(now())
+    updated_at     DateTime @updatedAt
+
+    user User @relation("UserWallets", fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@unique([user_id, wallet_address])
+}
+
+model UserHealthConnection {
+    id               Int       @id @default(autoincrement())
+    user_id          Int
+    platform_type    String
+    platform_user_id String
+    access_token     String?
+    refresh_token    String?
+    token_expires_at DateTime?
+    is_active        Boolean   @default(true)
+    created_at       DateTime  @default(now())
+    updated_at       DateTime  @updatedAt
+
+    user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@unique([user_id, platform_type])
+}
+
+model ChallengeCategory {
+    id          Int     @id @default(autoincrement())
+    name        String  @unique
+    description String?
+    icon_url    String?
+
+    challenges Challenge[]
+}
+
+model Challenge {
+    id                     Int      @id @default(autoincrement())
+    title                  String
+    description            String?
+    category_id            Int?
+    creator_id             Int?
+    is_public              Boolean  @default(true)
+    goal_type              String
+    goal_value             Int
+    duration_days          Int
+    stake_amount           Decimal
+    min_participants       Int      @default(2)
+    max_participants       Int?
+    start_date             DateTime
+    end_date               DateTime
+    registration_deadline  DateTime
+    status                 String   @default("pending")
+    smart_contract_address String?
+    created_at             DateTime @default(now())
+    updated_at             DateTime @updatedAt
+
+    category      ChallengeCategory?     @relation(fields: [category_id], references: [id])
+    creator       User?                  @relation("ChallengeCreator", fields: [creator_id], references: [id])
+    participants  ChallengeParticipant[]
+    rewards       ChallengeReward[]
+    DailyProgress DailyProgress[]
+    Transaction   Transaction[]
+}
+
+model Notification {
+    id                  Int     @id @default(autoincrement())
+    user_id             Int
+    title               String
+    message             String
+    type                String
+    is_read             Boolean @default(false)
+    related_entity_type String?
+    related_entity_id   Int?
+
+    user User @relation("NotificationToUser", fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model ChallengeParticipant {
+    id                   Int       @id @default(autoincrement())
+    challenge_id         Int
+    user_id              Int
+    status               String    @default("registered")
+    stake_transaction_id String?
+    stake_status         String    @default("pending")
+    joined_at            DateTime  @default(now())
+    completed_at         DateTime?
+
+    challenge Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+    user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@unique([challenge_id, user_id])
+}
+
+model DailyProgress {
+    id            Int      @id @default(autoincrement())
+    user_id       Int
+    challenge_id  Int
+    date          DateTime
+    steps_count   Int      @default(0)
+    goal_achieved Boolean  @default(false)
+    data_source   String
+
+    user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    challenge Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+
+    @@unique([user_id, challenge_id, date])
+}
+
+model Transaction {
+    id                   Int      @id @default(autoincrement())
+    user_id              Int
+    challenge_id         Int?
+    transaction_type     String
+    amount               Decimal
+    status               String
+    blockchain_tx_id     String?
+    blockchain_tx_status String?
+    created_at           DateTime @default(now())
+    updated_at           DateTime @updatedAt
+
+    user            User              @relation(fields: [user_id], references: [id])
+    challenge       Challenge?        @relation(fields: [challenge_id], references: [id])
+    ChallengeReward ChallengeReward[]
+}
+
+model ChallengeReward {
+    id             Int     @id @default(autoincrement())
+    challenge_id   Int
+    user_id        Int
+    amount         Decimal
+    transaction_id Int?
+
+    challenge   Challenge    @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+    user        User         @relation(fields: [user_id], references: [id])
+    transaction Transaction? @relation(fields: [transaction_id], references: [id])
+}
+
+model Achievement {
+    id           Int     @id @default(autoincrement())
+    name         String  @unique
+    description  String
+    icon_url     String?
+    requirements Json
+
+    userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+    id             Int      @id @default(autoincrement())
+    user_id        Int
+    achievement_id Int
+    earned_at      DateTime @default(now())
+
+    user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    achievement Achievement @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+
+    @@unique([user_id, achievement_id])
+}
+
+model Friendship {
+    id         Int      @id @default(autoincrement())
+    user_id    Int
+    friend_id  Int
+    status     String   @default("pending")
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    user   User @relation("UserFriendRequest", fields: [user_id], references: [id], onDelete: Cascade)
+    friend User @relation("FriendOfTheUser", fields: [friend_id], references: [id], onDelete: Cascade)
+
+    @@unique([user_id, friend_id])
+}
+
+model ChallengeGroup {
+    id          Int      @id @default(autoincrement())
+    name        String
+    description String?
+    creator_id  Int
+    is_private  Boolean  @default(true)
+    created_at  DateTime @default(now())
+    updated_at  DateTime @updatedAt
+
+    creator User                   @relation(fields: [creator_id], references: [id])
+    members ChallengeGroupMember[]
+}
+
+model ChallengeGroupMember {
+    id        Int      @id @default(autoincrement())
+    group_id  Int
+    user_id   Int
+    role      String   @default("member")
+    joined_at DateTime @default(now())
+
+    group ChallengeGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+    user  User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@unique([group_id, user_id])
+}
