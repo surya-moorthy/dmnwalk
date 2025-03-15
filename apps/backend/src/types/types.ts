@@ -94,16 +94,24 @@ export const JoinChallengeSchema = z.object({
 export const LeaveChallengeSchema = z.object({
     userId: z.string().min(1, "User ID is required")
   });
-
 export const DepositSchema = z.object({
-    amount: z.number().positive("Amount must be a positive number"),
-    currency: z.string().min(1, "Currency is required")
+    user_id: z.number().int().positive(),
+    payment_method_id: z.number().int().positive(),
+    amount: z.number().positive(),
+    transaction_type : z.string().default("deposit"),
+    currency: z.string().default("USD"),
+    status: z.string().default("pending"),
+    description: z.string().optional(),
   });
-
+  
 export const WithdrawSchema = z.object({
-    amount: z.number().positive("Amount must be a positive number"),
-    currency: z.string().min(1, "Currency is required")
+    user_id: z.number().int().positive(),
+    payment_method_id: z.number().int().positive(),
+    amount: z.number().positive(),
+    currency: z.string().default("USD"),
+    description: z.string().optional(),
   });
+  
 
 export const StakeSchema = z.object({
     amount: z.number().positive("Amount must be a positive number"),
