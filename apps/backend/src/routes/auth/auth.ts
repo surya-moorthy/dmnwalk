@@ -1,18 +1,18 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 export const authRoutes = Router();
-import { LoginBody, RegisterBody, ResetBody } from "../../types/types.js";
 import { prisma } from "@repo/db/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import z from "zod";
 import { userMiddleware } from "../../middleware/userMiddleware.js";
+import { LoginSchema, RegisterSchema, ResetSchema } from "../../types/types.js";
 dotenv.config();
 
 const jwtsecret : string = process.env.JWT_SECRET || "keysecret";
 
 authRoutes.post('/register',async (req,res)=>{
-   const {success} = RegisterBody.safeParse(req.body);
+   const {success} = RegisterSchema.safeParse(req.body);
    if (!success) {
        res.status(400).json({
          msg : "Invalid Inputs"
@@ -45,7 +45,7 @@ authRoutes.post('/register',async (req,res)=>{
 })
 
 authRoutes.post("/login",async (req,res)=>{
-  const {success} = LoginBody.safeParse(req.body);
+  const {success} = LoginSchema.safeParse(req.body);
   if (!success) {
    res.status(401).json({
       msg : "Invalid Inputs"
@@ -53,7 +53,7 @@ authRoutes.post("/login",async (req,res)=>{
    return 
 }
 
-   type loginRequest = z.infer<typeof LoginBody>;
+   type loginRequest = z.infer<typeof LoginSchema>;
 
    const {email,password} = req.body as loginRequest;
    try {
@@ -131,13 +131,13 @@ authRoutes.put("/profile",(req,res)=>{
 })
 
 authRoutes.post("/password/reset",async (req,res)=>{
-   const {success} = ResetBody.safeParse(req.body);
+   const {success} = ResetSchema.safeParse(req.body);
 
    if(!success) {
       res.status(401).json({  msg : "Invalid Inputs"  })
       return
    }
-   type resetRequest = z.infer<typeof ResetBody>;
+   type resetRequest = z.infer<typeof ResetSchema>;
    const {email,password} = req.body as resetRequest;
    try {
       const salt = await  bcrypt.genSalt(10);

@@ -86,7 +86,7 @@ model Challenge {
     max_participants       Int?
     start_date             DateTime
     end_date               DateTime
-    registration_deadline  DateTime
+    registration_deadline  DateTime? 
     status                 String   @default("pending")
     smart_contract_address String?
     created_at             DateTime @default(now())
