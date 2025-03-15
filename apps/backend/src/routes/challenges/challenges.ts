@@ -1,8 +1,8 @@
-import { prisma } from "@repo/db/client";
+import { Prisma, prisma } from "@repo/db/client";
 import { Router } from "express";
 
 import z from "zod";
-import { ChallengeSchema, ChallengeUpdateSchema } from "../../types/types";
+import { ChallengeUpdateSchema, CreateChallengeSchema } from "../../types/types";
 import { userMiddleware } from "../../middleware/userMiddleware";
 export const challengesRoutes = Router();
 
@@ -31,43 +31,15 @@ challengesRoutes.get('/',async (req,res)=>{
 })
 
 challengesRoutes.post('/',async (req,res)=>{
-    const result = ChallengeSchema.safeParse(req.body);
+    const result = CreateChallengeSchema.safeParse(req.body);
     if (!result.success) {
         res.status(401).json({ msg : "Invalid Inputs" })
         return
     }
     try {
-        const  data = result.data as z.infer<typeof ChallengeSchema>;
-        const challengeCategory = await prisma.challengeCategory.findFirst({
-            where : { 
-                OR : [
-                    { id : data.category.id },
-                    { name : data.category.name }
-                ]
-            }}
-        )
-
-        if (!challengeCategory){
-            res.status(401).json({ msg : "Invalid Category" })
-            return 
-        }
+        const  data = result.data as z.infer<typeof CreateChallengeSchema>;
         await prisma.challenge.create({
-            data : {
-                title : data.title,
-                description : data.description,
-                category : {
-                    connect : {
-                        id : challengeCategory.id,
-                        name : challengeCategory.name
-                    }
-                },
-                duration_days : data.duration_days,
-                stake_amount : data.stake_amount,
-                goal_type : data.goal_type,
-                goal_value : data.goal_value,
-                start_date : data.start_date,
-                end_date : data.end_date,
-            }
+            data : data
         })
         res.status(200).json({ msg : "Challenge Created Successfully"})
     }
@@ -79,8 +51,8 @@ challengesRoutes.post('/',async (req,res)=>{
     }
 })
 
-challengesRoutes.get('/:challengesId',async (req,res)=>{
-    const challengeId = req.params.challengesId;
+challengesRoutes.get('/:challengeId',async (req,res)=>{
+    const challengeId = req.params.challengeId;
     try {
        const challenge = await prisma.challenge.findUnique({
           where : {
@@ -194,12 +166,12 @@ challengesRoutes.get("/:challengeId/join", userMiddleware ,async (req, res) => {
      const challengeId = req.params.challengeId;
      const userId = res.locals.userId;
      try {
-        const verifiedChallenge = await prisma.challenge.findUnique({
+        const challenge = await prisma.challenge.findUnique({
             where : {
                 id : Number(challengeId)
             }
         })
-        if (!verifiedChallenge) {
+        if (!challenge) {
             res.status(401).json({
                 msg : "Invalid Challenge Id"
             })
@@ -215,20 +187,25 @@ challengesRoutes.get("/:challengeId/join", userMiddleware ,async (req, res) => {
                 msg : "Invalid User Id"
             })
             return
-        }
+        } 
+        const requiresStake = Number(challenge.stake_amount) > 0;
         const challengeparticipate = await prisma.challengeParticipant.create({
-            data : {
-                challenge : {
-                    connect : {
-                        id : verifiedChallenge.id,
-                    }
-                },
-                user : {
-                    connect : {
-                        id : user.id
-                    }
-                }
-            }
+               data : {
+                challenge_id: challenge.id,
+                user_id: Number(userId),
+                status: "registered", // Default value
+                stake_amount: challenge.stake_amount, // Get from challenge
+                stake_transaction_id: challenge.smart_contract_address, // Handle stake conditionally
+                stake_status:  requiresStake ? "pending" : "corequnfirmed", // Change based on challenge
+                current_progress: new Prisma.Decimal(0), // Default value
+                current_streak: 0, // Default value
+                longest_streak: 0, // Default value
+                total_points: 0, // Default value
+                joined_at: new Date(), // Default value
+                completed_at: challenge.end_date ?? null, // Use challenge's end_date
+                last_activity_at: new Date(), // Can be set to null if not needed
+
+               }
         })
         
         res.status(200).json({ 
@@ -261,6 +238,132 @@ challengesRoutes.get("/:challengeId/participants",async (req, res) => {
 }
 })
 
+challengesRoutes.get("/:challengeId/leave",async (req, res) => {
+    const challengeId = req.params.challengeId;
+    const userId = res.locals.userId;
+    try {
+        const challenge = await prisma.challenge.findUnique({
+            where : {
+                id : Number(challengeId)
+            }
+        })
+        if (!challenge) {
+            res.status(401).json({
+                msg : "Invalid Challenge Id"
+            })
+            return
+        }
+        const user = await prisma.user.findUnique({
+            where : {
+                id : Number(userId)
+            }
+        }) 
+        if (!user) {
+            res.status(401).json({
+                msg : "Invalid User Id"
+            })
+            return
+        } 
+        await prisma.challengeParticipant.deleteMany({
+            where : {
+                challenge_id : Number(challengeId),
+                user_id : Number(userId)
+            }
+        })
+        res.status(200).json({ 
+            msg : "User Left the Challenge"
+        })
+    }
+    catch(error) {
+        console.error("Error leaving challenge:", error);
+        res.status(500).json({ msg: "Internal server error" });
+    }
+})
 challengesRoutes.get("/trending",async (req, res) => {
+   
+})
+challengesRoutes.get("/:challengeId/stake",async (req, res) => {
+    const challengeId = req.params.challengeId;
+    try {
+        const challengeStake = await prisma.challenge.findFirst({
+            where : {
+               id : Number(challengeId)
+            },
+            select : {
+                stake_amount : true
+            }
+        })
+    }
+    catch(e) {
+        console.log("error",e); 
+        res.status(403).json({  
+              msg : "An Error Occured while getting challenge stake",
+        })
+    }
+})
+challengesRoutes.get("/:challengeId/pool",async (req, res) => {
+    const challengeId = req.params.challengeId;
+    try {
+        const challengePool = await prisma.challenge.findFirst({
+            where : {
+                id : Number(challengeId)
+            }, 
+            select : {
+                total_pool : true
+            }
+        })
+        res.status(200).json({
+            challengeReward : challengePool
+        })
+    }
+    catch(e) {
+        console.log("error",e); 
+        res.status(403).json({  
+              msg : "An Error Occured while getting challenge pool ",
+        })
+    }
+})
+challengesRoutes.get("/:challengeId/rewards",async (req, res) => {
+    const challengeId = req.params.challengeId;
+    try {
+        const challengeRewards = await prisma.challengeReward.findFirst({
+            where : {
+                challenge_id : Number(challengeId)
+            }
+        })
+        res.status(200).json({
+            challengeReward : challengeRewards
+        })
+    }
+    catch(e) {
+        console.log("error",e); 
+        res.status(403).json({  
+              msg : "An Error Occured while getting challenge rewards",
+        })
+    }
+})
+challengesRoutes.get("/:challengeId/progress",async (req, res) => {
+     const challengeId = req.params.challengeId;
+     try {
+        const challengeProgress = await prisma.challenge.findFirst({
+            where : {
+                id : Number(challengeId)
+            }, 
+            select : {
+                dailyProgress : true
+            }
+        })
+        res.status(200).json({
+            challengeProgress : challengeProgress
+        })
+     }
+     catch(e) {
+        console.log("error",e); 
+        res.status(403).json({  
+              msg : "An Error Occured while getting challenge daily progress",
+        })
+    }   
+})
+challengesRoutes.get("/:challengeId/statistics",async (req, res) => {
 
 })

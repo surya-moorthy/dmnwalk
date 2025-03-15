@@ -159,40 +159,4 @@ authRoutes.post("/password/reset",async (req,res)=>{
    }  
 })
 
-authRoutes.get("/users/:userId",async (req,res)=>{
-     const userId = req.params.userId;
 
-     try {
-      const user = await prisma.user.findFirst({
-         where : {
-            id : Number(userId)
-         },
-         select : {
-            id : true ,
-            username : true,
-            email : true
-         }
-     })
-     res.status(200).json({
-      user : user
-     })
-  }
-  catch(e){
-   res.status(403).json({
-      msg : "Error occured",
-      err : e
-   })
-  }
-})
-
-authRoutes.put("/api/users/{userId}/preferences",(req,res)=>{
-  res.json({
-   msg : "put request"
-  })
-})
-
-authRoutes.get(" /api/users/{userId}/stats",(req,res)=>{
-   res.json({
-      msg : "get stats request"
-   })
-})

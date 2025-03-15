@@ -57,10 +57,7 @@ userRoutes.get("/:userId/stats",async (req,res)=>{
             id : Number(userId)
         },
         include : {
-            achievements : true,
-            dailyProgress : true,
-            Rewards : true,
-            UserFriends : true      
+            userstats : true
         }
     })
     res.status(200).json({
@@ -82,8 +79,8 @@ userRoutes.get("/:userId/challenges",async (req,res)=>{
               id : Number(userId)
           },
           include : {
-             challengeParticipants : true,
-             ChallengeGroup : true    
+             createdChallenges : true,
+             participatedChallenges : true    
           }
       })
       res.status(200).json({
@@ -105,7 +102,7 @@ userRoutes.get("/:userId/achievements",async (req,res)=>{
                 id : Number(userId)
             },
             include : {
-                achievements : true
+                userAchievements : true
             }
         })
         res.status(200).json({
@@ -119,3 +116,4 @@ userRoutes.get("/:userId/achievements",async (req,res)=>{
         })
     }
 })
+

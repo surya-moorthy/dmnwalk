@@ -26,52 +26,34 @@ export const PreferencesSchema = z.object({
     theme: z.string().default("dark")
   });
 
-export const ChallengeSchema = z.object({
-    // Required fields
-    title: z.string().min(1, "Title is required").max(100, "Title must be less than 100 characters"),
-    
-    description: z.string().max(1000, "Description must be less than 1000 characters").nullable().optional(),
-    
-    // Category handling - could be an ID or a name depending on your frontend approach
-    category: z.object({
-      // If connecting to existing category by ID
-      id: z.number().int().positive().optional(),
-      // If connecting to existing category by name or creating new one
-      name: z.string().min(1).optional()
-    }).refine(data => data.id !== undefined || data.name !== undefined, {
-      message: "Either category ID or name must be provided"
-    }),
-    
+export const CreateChallengeSchema = z.object({
+    title: z.string().min(3, "Title must be at least 3 characters long"),
+    description: z.string().optional(),
+    category_id: z.number().int().positive().optional(),
     creator_id: z.number().int().positive().optional(),
- 
     is_public: z.boolean().default(true),
-
-    goal_type: z.string().min(1, "Goal type is required"),
-    goal_value: z.number().int().positive("Goal value must be a positive number"),
-
-    duration_days: z.number().int().positive("Duration must be a positive number of days"),
-
-    stake_amount: z.string()
-      .refine(val => !isNaN(parseFloat(val)), "Stake amount must be a valid number")
-      .transform(val => parseFloat(val)),
-    
-    min_participants: z.number().int().positive().default(2),
-    max_participants: z.number().int().positive().nullable().optional(),
-
-    start_date: z.string()
-      .refine(val => !isNaN(Date.parse(val)), "Start date must be a valid date")
-      .transform(val => new Date(val)),
-    
-    end_date: z.string()
-      .refine(val => !isNaN(Date.parse(val)), "End date must be a valid date")
-      .transform(val => new Date(val)),
-    
-    registration_deadline: z.string()
-      .refine(val => !isNaN(Date.parse(val)), "Registration deadline must be a valid date")
-      .transform(val => new Date(val)),
-    status: z.string().default("pending").optional(),
-    smart_contract_address: z.string().nullable().optional()
+    goal_type: z.string(), // e.g., "steps", "distance", "meditation"
+    goal_value: z.number().positive("Goal value must be a positive number"), // Target value (e.g., 5000 steps)
+    goal_unit: z.string(), // e.g., "steps", "minutes"
+    frequency: z.enum(["daily", "weekly"]).default("daily"),
+    duration_days: z.number().int().positive("Duration must be a positive number"),
+    stake_amount: z.string().refine((val) => !isNaN(parseFloat(val)), {
+      message: "Stake amount must be a valid decimal number",
+    }),
+    total_pool: z.string().optional().refine((val) => !val || !isNaN(parseFloat(val)), {
+      message: "Total pool must be a valid decimal number",
+    }),
+    min_participants: z.number().int().min(2).default(2),
+    max_participants: z.number().int().optional(),
+    start_date: z.coerce.date(),
+    end_date: z.coerce.date(),
+    registration_deadline: z.coerce.date().optional(),
+    reward_distribution_type: z.enum(["proportional", "winner-takes-all", "equal"]).default("proportional"),
+    status: z.enum(["pending", "active", "completed", "canceled"]).default("pending"),
+    smart_contract_address: z.string().optional(),
+    escrow_address: z.string().optional(),
   });
+  
   
 export const UpdateUserPreferencesSchema = z.object({
     theme: z.enum(["light", "dark"]).optional(),
