@@ -1,8 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 export const authRoutes = Router();
-import { LoginBody, RegisterBody } from "../../types/types.js";
-import { prisma } from "@repo/db";
+import { LoginBody, RegisterBody, ResetBody } from "../../types/types.js";
+import { prisma } from "@repo/db/client";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import z from "zod";
+import { userMiddleware } from "../../middleware/userMiddleware.js";
+dotenv.config();
+
+const jwtsecret : string = process.env.JWT_SECRET || "keysecret";
 
 authRoutes.post('/register',async (req,res)=>{
    const {success} = RegisterBody.safeParse(req.body);
@@ -42,6 +49,150 @@ authRoutes.post("/login",async (req,res)=>{
   if (!success) {
    res.status(401).json({
       msg : "Invalid Inputs"
-   })}
-   const {email,password} = req.body;
+   })
+   return 
+}
+
+   type loginRequest = z.infer<typeof LoginBody>;
+
+   const {email,password} = req.body as loginRequest;
+   try {
+      const user  = await prisma.user.findFirst({
+        where : {
+           email: email 
+        }    
+      })
+      if (!user) {
+         res.status(401).json({
+            msg : "your are not registered"
+         })
+         return
+      }
+  
+      const passverify = bcrypt.compare(password,user?.password_hash as string);
+      if (!passverify) {
+         res.status(401).json({
+            msg : "Password Invalid"
+         })
+      }
+      const jwtToken =  jwt.sign({userId: user?.id,email},jwtsecret, {expiresIn : '10min'});
+      res.status(200).json({
+         msg : "User logged in Successfully",
+         token : jwtToken
+      })
+   }
+   catch(e){
+        res.status(403).json({
+         msg : "An Error occured",
+         err : e
+        })
+   }
+})
+
+authRoutes.post("/logout",userMiddleware,async (req,res)=>{
+   const userId = res.locals.userId;
+    try {
+      await prisma.user.delete({
+         where : {
+            id : userId,    
+         }
+      })
+      res.status(200).json({
+         msg : "User Logged out successfully"
+      })
+    }
+    catch(e) {
+      msg : "Error Occured while Log out"
+    }
+})
+
+authRoutes.get('/me',userMiddleware,async (req,res)=> {
+   const userId = res.locals.userId;
+   try {
+      const user = await prisma.user.findFirst({
+         where : {
+            id : Number(userId)
+         }
+      })
+      res.status(200).json({
+         user : user
+      })
+   }
+   catch(e) {
+      res.status(403).json({
+         msg : "Error Occured",
+         err : e
+      })
+   }
+})
+
+authRoutes.put("/profile",(req,res)=>{
+
+})
+
+authRoutes.post("/password/reset",async (req,res)=>{
+   const {success} = ResetBody.safeParse(req.body);
+
+   if(!success) {
+      res.status(401).json({  msg : "Invalid Inputs"  })
+      return
+   }
+   type resetRequest = z.infer<typeof ResetBody>;
+   const {email,password} = req.body as resetRequest;
+   try {
+      const salt = await  bcrypt.genSalt(10);
+      const hashedpass = await bcrypt.hash(password,salt);
+      await prisma.user.update({
+         where : {
+            email : email
+         },
+         data : {
+            password_hash : hashedpass
+         }
+      })
+      res.status(200).json({ msg : "Password reset Successfully"})
+   } catch(e) {
+       res.status(403).json({ 
+         msg : "error occured",
+         err : e
+        })
+   }  
+})
+
+authRoutes.get("/users/:userId",async (req,res)=>{
+     const userId = req.params.userId;
+
+     try {
+      const user = await prisma.user.findFirst({
+         where : {
+            id : Number(userId)
+         },
+         select : {
+            id : true ,
+            username : true,
+            email : true
+         }
+     })
+     res.status(200).json({
+      user : user
+     })
+  }
+  catch(e){
+   res.status(403).json({
+      msg : "Error occured",
+      err : e
+   })
+  }
+})
+
+authRoutes.put("/api/users/{userId}/preferences",(req,res)=>{
+  res.json({
+   msg : "put request"
+  })
+})
+
+authRoutes.get(" /api/users/{userId}/stats",(req,res)=>{
+   res.json({
+      msg : "get stats request"
+   })
 })
