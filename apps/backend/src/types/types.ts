@@ -73,6 +73,24 @@ export const ChallengeSchema = z.object({
     smart_contract_address: z.string().nullable().optional()
   });
   
+export const UpdateUserPreferencesSchema = z.object({
+    theme: z.enum(["light", "dark"]).optional(),
+    language: z.string().optional(),
+    notifications: z.object({
+        email: z.boolean().optional(),
+        push: z.boolean().optional(),
+        sms: z.boolean().optional(),
+    }).optional(),
+    emailNotifications: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
+    dailyReminders: z.boolean().optional(),
+    privacySettings: z.object({
+      profileVisibility: z.enum(["public", "friendsOnly", "private"]).optional(),
+      activityVisibility: z.enum(["public", "friendsOnly", "private"]).optional(),
+      emailVisibility: z.enum(["public", "friendsOnly", "private"]).optional(),
+    }).optional(),
+  });
+  
  export const ChallengeUpdateSchema = z.object({
     title: z.string().min(3).max(100).optional(),
     description: z.string().nullable().optional(),

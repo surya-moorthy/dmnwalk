@@ -6,231 +6,505 @@ datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
 }
-
+// User Management
 model User {
-    id                  Int     @id @default(autoincrement())
-    username            String  @unique
-    password_hash       String
-    email               String  @unique
-    profile_picture_url String?
-    timezone            String  @default("UTC")
-
-    wallets               UserWallet[]           @relation("UserWallets")
-    healthConnections     UserHealthConnection[]
-    Notification          Notification[]         @relation("NotificationToUser")
-    notificationId        Int?
-    dailyProgress         DailyProgress[]
-    ChallengeCreated      Challenge[]            @relation("ChallengeCreator")
-    challengeParticipants ChallengeParticipant[]
-    Rewards               ChallengeReward[]
-    Transaction           Transaction[]
-    achievements          UserAchievement[]
-    FriendShipReq         Friendship[]           @relation("UserFriendRequest")
-    UserFriends           Friendship[]           @relation("FriendOfTheUser")
-    ChallengeGroup        ChallengeGroup[]
-    ChallengeGroupMember  ChallengeGroupMember[]
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique
+  password_hash       String
+  email               String    @unique
+  profile_picture_url String?
+  timezone            String    @default("UTC")
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  // Embedded user stats
+  total_challenges_joined   Int     @default(0)
+  total_challenges_completed Int     @default(0)
+  total_challenges_failed   Int     @default(0)
+  completion_rate           Decimal @default(0)
+  total_points              Int     @default(0)
+  current_streak            Int     @default(0)
+  longest_streak            Int     @default(0)
+  
+  // Relations
+  preferences         UserPreferences?
+  wallets             UserWallet[]
+  healthConnections   UserHealthConnection[]
+  notifications       Notification[]
+  dailyProgress       DailyProgress[]
+  createdChallenges   Challenge[]            @relation("ChallengeCreator")
+  participatedChallenges ChallengeParticipant[]
+  rewards             ChallengeReward[]
+  transactions        Transaction[]
+  userBadges          UserBadge[]
+  userAchievements    UserAchievement[]
+  friendRequestsSent  Friendship[]           @relation("UserFriendRequest")
+  friendRequestsReceived Friendship[]        @relation("FriendOfTheUser")
+  createdGroups       ChallengeGroup[]
+  groupMemberships    ChallengeGroupMember[]
+  leaderboardEntries  LeaderboardEntry[]
 }
 
+model UserPreferences {
+  id                  Int       @id @default(autoincrement())
+  userId              Int       @unique 
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Appearance
+  theme               String    @default("light")
+  language            String    @default("en")
+  
+  // Notification settings
+  email_notifications Boolean   @default(true)
+  push_notifications  Boolean   @default(true)
+  daily_reminders     Boolean   @default(true)
+  challenge_updates   Boolean   @default(true)
+  friend_activity     Boolean   @default(true)
+  reward_notifications Boolean   @default(true)
+  
+  // Privacy settings
+  profile_visibility  String    @default("friends") // public, friends, private
+  activity_sharing    Boolean   @default(true)
+  show_on_leaderboards Boolean  @default(true)
+  
+  // Payment preferences
+  default_payment_method String?
+  default_withdrawal_method String?
+  
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+}
+
+// Financial management
 model UserWallet {
-    id             Int      @id @default(autoincrement())
-    user_id        Int
-    wallet_address String
-    wallet_type    String   @default("solana")
-    is_primary     Boolean  @default(true)
-    created_at     DateTime @default(now())
-    updated_at     DateTime @updatedAt
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  wallet_address      String
+  wallet_type         String    @default("solana")
+  is_primary          Boolean   @default(false)
+  balance             Decimal   @default(0)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
-    user User @relation("UserWallets", fields: [user_id], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  paymentMethods      PaymentMethod[]
 
-    @@unique([user_id, wallet_address])
+  @@unique([user_id, wallet_address])
 }
 
-model UserHealthConnection {
-    id               Int       @id @default(autoincrement())
-    user_id          Int
-    platform_type    String
-    platform_user_id String
-    access_token     String?
-    refresh_token    String?
-    token_expires_at DateTime?
-    is_active        Boolean   @default(true)
-    created_at       DateTime  @default(now())
-    updated_at       DateTime  @updatedAt
-
-    user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-    @@unique([user_id, platform_type])
-}
-
-model ChallengeCategory {
-    id          Int     @id @default(autoincrement())
-    name        String  @unique
-    description String?
-    icon_url    String?
-
-    challenges Challenge[]
-}
-
-model Challenge {
-    id                     Int      @id @default(autoincrement())
-    title                  String
-    description            String?
-    category_id            Int?
-    creator_id             Int?
-    is_public              Boolean  @default(true)
-    goal_type              String
-    goal_value             Int
-    duration_days          Int
-    stake_amount           Decimal
-    min_participants       Int      @default(2)
-    max_participants       Int?
-    start_date             DateTime
-    end_date               DateTime
-    registration_deadline  DateTime? 
-    status                 String   @default("pending")
-    smart_contract_address String?
-    created_at             DateTime @default(now())
-    updated_at             DateTime @updatedAt
-
-    category      ChallengeCategory?     @relation(fields: [category_id], references: [id])
-    creator       User?                  @relation("ChallengeCreator", fields: [creator_id], references: [id])
-    participants  ChallengeParticipant[]
-    rewards       ChallengeReward[]
-    DailyProgress DailyProgress[]
-    Transaction   Transaction[]
-}
-
-model Notification {
-    id                  Int     @id @default(autoincrement())
-    user_id             Int
-    title               String
-    message             String
-    type                String
-    is_read             Boolean @default(false)
-    related_entity_type String?
-    related_entity_id   Int?
-
-    user User @relation("NotificationToUser", fields: [user_id], references: [id], onDelete: Cascade)
-}
-
-model ChallengeParticipant {
-    id                   Int       @id @default(autoincrement())
-    challenge_id         Int
-    user_id              Int
-    status               String    @default("registered")
-    stake_transaction_id String?
-    stake_status         String    @default("pending")
-    joined_at            DateTime  @default(now())
-    completed_at         DateTime?
-
-    challenge Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
-    user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-    @@unique([challenge_id, user_id])
-}
-
-model DailyProgress {
-    id            Int      @id @default(autoincrement())
-    user_id       Int
-    challenge_id  Int
-    date          DateTime
-    steps_count   Int      @default(0)
-    goal_achieved Boolean  @default(false)
-    data_source   String
-
-    user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-    challenge Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
-
-    @@unique([user_id, challenge_id, date])
+model PaymentMethod {
+  id                  Int       @id @default(autoincrement())
+  user_wallet_id      Int
+  type                String    // credit_card, bank_account, crypto
+  provider            String    // visa, mastercard, etc.
+  account_identifier  String    // last 4 digits or similar
+  is_default          Boolean   @default(false)
+  metadata            Json?     // Additional provider-specific data
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  wallet              UserWallet @relation(fields: [user_wallet_id], references: [id], onDelete: Cascade)
+  transactions        Transaction[] @relation("PaymentMethodTransactions")
 }
 
 model Transaction {
-    id                   Int      @id @default(autoincrement())
-    user_id              Int
-    challenge_id         Int?
-    transaction_type     String
-    amount               Decimal
-    status               String
-    blockchain_tx_id     String?
-    blockchain_tx_status String?
-    created_at           DateTime @default(now())
-    updated_at           DateTime @updatedAt
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  challenge_id        Int?
+  payment_method_id   Int?
+  transaction_type    String    // deposit, withdrawal, stake, reward, refund
+  amount              Decimal
+  fee                 Decimal   @default(0)
+  currency            String    @default("USD")
+  status              String    // pending, completed, failed, canceled
+  balance_before      Decimal
+  balance_after       Decimal
+  description         String?
+  blockchain_tx_id    String?
+  blockchain_tx_status String?
+  metadata            Json?     // Additional transaction data
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
-    user            User              @relation(fields: [user_id], references: [id])
-    challenge       Challenge?        @relation(fields: [challenge_id], references: [id])
-    ChallengeReward ChallengeReward[]
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  challenge           Challenge? @relation(fields: [challenge_id], references: [id])
+  paymentMethod       PaymentMethod? @relation("PaymentMethodTransactions", fields: [payment_method_id], references: [id])
+  challengeRewards    ChallengeReward[]
+  
+  @@index([user_id, transaction_type])
+  @@index([challenge_id])
+}
+
+// Health data integration
+model UserHealthConnection {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  platform_type       String    // google_fit, apple_health, fitbit
+  platform_user_id    String
+  access_token        String?
+  refresh_token       String?
+  token_expires_at    DateTime?
+  last_sync_at        DateTime?
+  sync_frequency      String    @default("daily") // daily, realtime
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  healthData          HealthData[]
+
+  @@unique([user_id, platform_type])
+}
+
+model HealthData {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  connection_id       Int
+  data_type           String    // steps, distance, calories, sleep, etc.
+  date                DateTime
+  value               Float
+  unit                String
+  source              String    // the specific platform or manual entry
+  is_verified         Boolean   @default(false)
+  created_at          DateTime  @default(now())
+
+  connection          UserHealthConnection @relation(fields: [connection_id], references: [id], onDelete: Cascade)
+  
+  @@index([user_id, data_type, date])
+}
+
+// Challenge management
+model ChallengeCategory {
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  description         String?
+  icon_url            String?
+  
+  challenges          Challenge[]
+}
+
+model Challenge {
+  id                  Int       @id @default(autoincrement())
+  title               String
+  description         String?
+  category_id         Int?
+  creator_id          Int?
+  is_public           Boolean   @default(true)
+  goal_type           String    // steps, distance, meditation, etc.
+  goal_value          Int       // Target value (e.g., 5000 steps)
+  goal_unit           String    // steps, minutes, etc.
+  frequency           String    @default("daily") // daily, weekly
+  duration_days       Int
+  stake_amount        Decimal
+  total_pool          Decimal   @default(0)
+  min_participants    Int       @default(2)
+  max_participants    Int?
+  start_date          DateTime
+  end_date            DateTime
+  registration_deadline DateTime?
+  reward_distribution_type String @default("proportional") // proportional, winner-takes-all, equal
+  status              String    @default("pending") // pending, active, completed, canceled
+  smart_contract_address String?
+  escrow_address      String?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  category            ChallengeCategory? @relation(fields: [category_id], references: [id])
+  creator             User?     @relation("ChallengeCreator", fields: [creator_id], references: [id])
+  participants        ChallengeParticipant[]
+  rewards             ChallengeReward[]
+  dailyProgress       DailyProgress[]
+  transactions        Transaction[]
+  leaderboardEntries  LeaderboardEntry[]
+  
+  @@index([status, start_date, end_date])
+  @@index([is_public, status])
+}
+
+model ChallengeParticipant {
+  id                  Int       @id @default(autoincrement())
+  challenge_id        Int
+  user_id             Int
+  status              String    @default("registered") // registered, active, completed, failed, withdrawn
+  stake_amount        Decimal
+  stake_transaction_id String?
+  stake_status        String    @default("pending") // pending, confirmed, refunded
+  current_progress    Decimal   @default(0)         // Percentage of completion
+  current_streak      Int       @default(0)
+  longest_streak      Int       @default(0)
+  total_points        Int       @default(0)
+  joined_at           DateTime  @default(now())
+  completed_at        DateTime?
+  last_activity_at    DateTime?
+
+  challenge           Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([challenge_id, user_id])
+}
+
+model DailyProgress {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  challenge_id        Int
+  date                DateTime
+  value               Float     // The actual value recorded (e.g., step count)
+  percentage          Float     // Percentage of goal achieved
+  goal_achieved       Boolean   @default(false)
+  data_source         String    // google_fit, apple_health, fitbit, manual
+  verified            Boolean   @default(false)
+  verification_method String?   // How the data was verified
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  challenge           Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, challenge_id, date])
 }
 
 model ChallengeReward {
-    id             Int     @id @default(autoincrement())
-    challenge_id   Int
-    user_id        Int
-    amount         Decimal
-    transaction_id Int?
+  id                  Int       @id @default(autoincrement())
+  challenge_id        Int
+  user_id             Int
+  amount              Decimal
+  percentage_of_pool  Decimal   // What percentage of the total pool this reward represents
+  transaction_id      Int?
+  status              String    @default("pending") // pending, processing, completed, failed
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
-    challenge   Challenge    @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
-    user        User         @relation(fields: [user_id], references: [id])
-    transaction Transaction? @relation(fields: [transaction_id], references: [id])
+  challenge           Challenge  @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+  user                User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  transaction         Transaction? @relation(fields: [transaction_id], references: [id])
+}
+
+// Gamification
+model Badge {
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  description         String
+  category            String    // fitness, wellness, consistency, etc.
+  difficulty          String    // easy, medium, hard
+  icon_url            String?
+  point_value         Int       @default(100)
+  requirements        Json      // Criteria for earning this badge
+  
+  userBadges          UserBadge[]
+}
+
+model UserBadge {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  badge_id            Int
+  earned_at           DateTime  @default(now())
+  progress            Float?    @default(0) // For badges in progress
+  
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  badge               Badge     @relation(fields: [badge_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, badge_id])
+}
+
+model LeaderboardEntry {
+  id                  Int       @id @default(autoincrement())
+  challenge_id        Int
+  user_id             Int
+  rank                Int
+  points              Int
+  progress            Float     // Percentage of completion
+  streak_days         Int       @default(0)
+  updated_at          DateTime  @default(now())
+  
+  challenge           Challenge @relation(fields: [challenge_id], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([challenge_id, user_id])
+  @@index([challenge_id, rank])
 }
 
 model Achievement {
-    id           Int     @id @default(autoincrement())
-    name         String  @unique
-    description  String
-    icon_url     String?
-    requirements Json
-
-    userAchievements UserAchievement[]
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  description         String
+  category            String    // lifetime, challenge, consistency, etc.
+  icon_url            String?
+  point_value         Int       @default(100)
+  requirements        Json      // Criteria for earning this achievement
+  
+  userAchievements    UserAchievement[]
 }
 
 model UserAchievement {
-    id             Int      @id @default(autoincrement())
-    user_id        Int
-    achievement_id Int
-    earned_at      DateTime @default(now())
-
-    user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-    achievement Achievement @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
-
-    @@unique([user_id, achievement_id])
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  achievement_id      Int
+  earned_at           DateTime  @default(now())
+  
+  user                User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  achievement         Achievement @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, achievement_id])
 }
 
+// Social features
 model Friendship {
-    id         Int      @id @default(autoincrement())
-    user_id    Int
-    friend_id  Int
-    status     String   @default("pending")
-    created_at DateTime @default(now())
-    updated_at DateTime @updatedAt
-
-    user   User @relation("UserFriendRequest", fields: [user_id], references: [id], onDelete: Cascade)
-    friend User @relation("FriendOfTheUser", fields: [friend_id], references: [id], onDelete: Cascade)
-
-    @@unique([user_id, friend_id])
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  friend_id           Int
+  status              String    @default("pending") // pending, accepted, rejected, blocked
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  user                User      @relation("UserFriendRequest", fields: [user_id], references: [id], onDelete: Cascade)
+  friend              User      @relation("FriendOfTheUser", fields: [friend_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, friend_id])
 }
 
 model ChallengeGroup {
-    id          Int      @id @default(autoincrement())
-    name        String
-    description String?
-    creator_id  Int
-    is_private  Boolean  @default(true)
-    created_at  DateTime @default(now())
-    updated_at  DateTime @updatedAt
-
-    creator User                   @relation(fields: [creator_id], references: [id])
-    members ChallengeGroupMember[]
+  id                  Int       @id @default(autoincrement())
+  name                String
+  description         String?
+  creator_id          Int
+  is_private          Boolean   @default(true)
+  invitation_code     String?   @unique
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  creator             User      @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  members             ChallengeGroupMember[]
 }
 
 model ChallengeGroupMember {
-    id        Int      @id @default(autoincrement())
-    group_id  Int
-    user_id   Int
-    role      String   @default("member")
-    joined_at DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  group_id            Int
+  user_id             Int
+  role                String    @default("member") // admin, member
+  joined_at           DateTime  @default(now())
+  
+  group               ChallengeGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user                User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([group_id, user_id])
+}
 
-    group ChallengeGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
-    user  User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+// Notifications
+model Notification {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  title               String
+  message             String
+  type                String    // challenge_update, achievement, reward, friend_request, milestone, system
+  priority            String    @default("normal") // high, normal, low
+  is_read             Boolean   @default(false)
+  action_url          String?   // Deep link to relevant content
+  related_entity_type String?   // challenge, badge, transaction, etc.
+  related_entity_id   Int?
+  created_at          DateTime  @default(now())
+  expires_at          DateTime?
 
-    @@unique([group_id, user_id])
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@index([user_id, is_read])
+  @@index([user_id, type])
+}
+
+// For Solana integration
+model SolanaAccount {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int       @unique
+  public_key          String    @unique
+  encrypted_private_key String?  // Encrypted for security
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  @@index([public_key])
+}
+
+model SolanaTransaction {
+  id                  Int       @id @default(autoincrement())
+  signature           String    @unique
+  sender              String
+  recipient           String
+  amount              Decimal
+  fee                 Decimal
+  status              String    // confirmed, pending, failed
+  block_time          DateTime?
+  related_challenge_id Int?
+  related_user_id     Int?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  @@index([sender])
+  @@index([recipient])
+  @@index([related_challenge_id])
+}
+
+// Social feed and interactions
+model SocialActivity {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int
+  activity_type       String    // challenge_joined, goal_achieved, badge_earned, etc.
+  content             String?
+  related_entity_type String?   // challenge, badge, etc.
+  related_entity_id   Int?
+  is_public           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  
+  comments            Comment[]
+  likes               Like[]
+  
+  @@index([user_id, created_at])
+}
+
+model Comment {
+  id                  Int       @id @default(autoincrement())
+  activity_id         Int
+  user_id             Int
+  content             String
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  
+  activity            SocialActivity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  
+  @@index([activity_id])
+}
+
+model Like {
+  id                  Int       @id @default(autoincrement())
+  activity_id         Int
+  user_id             Int
+  created_at          DateTime  @default(now())
+  
+  activity            SocialActivity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  
+  @@unique([activity_id, user_id])
+}
+
+// Analytics and reporting
+model UserStats {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int       @unique
+  total_steps         Int       @default(0)
+  challenges_completed Int      @default(0)
+  challenges_failed   Int       @default(0)
+  total_earned        Decimal   @default(0)
+  total_staked        Decimal   @default(0)
+  average_completion  Float     @default(0)  // Average completion rate
+  longest_streak      Int       @default(0)
+  total_badges        Int       @default(0)
+  total_points        Int       @default(0)
+  last_active         DateTime?
+  updated_at          DateTime  @default(now())
+}
+
+// System settings and configurations
+model SystemSetting {
+  id                  Int       @id @default(autoincrement())
+  key                 String    @unique
+  value               String
+  description         String?
+  updated_at          DateTime  @updatedAt
 }
