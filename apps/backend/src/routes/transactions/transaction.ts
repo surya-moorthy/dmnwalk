@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { DepositSchema } from "../../types/types";
 import z from "zod";
-import { prisma } from "@repo/db/client";
+import { prisma } from "@repo/db";
 import { userMiddleware } from "../../middleware/userMiddleware";
 
 export const transactionRoutes = Router();

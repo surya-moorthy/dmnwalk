@@ -2,6 +2,9 @@ import { Router } from "express";
 
 export const adminroutes = Router();
 
+adminroutes.get('/login',(req,res)=>{
+})
+
 adminroutes.get('/challenges',(req,res)=>{
 })
 adminroutes.put('/challenges/:challengeId',(req,res)=>{

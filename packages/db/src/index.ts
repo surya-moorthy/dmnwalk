@@ -1,11 +1,10 @@
+
+
 // packages/db/src/index.ts
-import { PrismaClient } from "@prisma/client";
+const  { PrismaClient } =  require("@prisma/client");
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+const prisma = new PrismaClient();
+
+module.exports = {
+  prisma
 };
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-
-export * from "@prisma/client";

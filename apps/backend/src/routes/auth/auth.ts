@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 export const authRoutes = Router();
-import { prisma } from "@repo/db/client";
+import  {prisma}  from "@repo/db/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import z from "zod";

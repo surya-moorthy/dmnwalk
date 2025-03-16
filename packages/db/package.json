@@ -4,9 +4,6 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    "./client": "./src/index.ts"
-  },
   "scripts": {
     "build": "prisma generate && tsc",
     "dev": "tsc --watch",
